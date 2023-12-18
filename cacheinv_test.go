@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/QuangTung97/eventx"
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/jmoiron/sqlx"
 	"github.com/redis/go-redis/v9"
@@ -61,7 +62,7 @@ func initClients() map[int64]*redis.Client {
 	return globalClients
 }
 
-func newJobTest(_ *testing.T) *jobTest {
+func newJobTest(_ *testing.T, options ...cacheinv.Option) *jobTest {
 	db := initDB()
 
 	db.MustExec(`TRUNCATE invalidate_events`)
@@ -83,7 +84,7 @@ func newJobTest(_ *testing.T) *jobTest {
 		db:      db,
 		repo:    repo,
 		clients: redisClients,
-		inv:     cacheinv.NewInvalidatorJob(repo, client),
+		inv:     cacheinv.NewInvalidatorJob(repo, client, options...),
 	}
 }
 
@@ -118,13 +119,12 @@ func TestInvalidatorJob(t *testing.T) {
 		j.run()
 
 		time.Sleep(500 * time.Millisecond)
+		j.waitCompleted()
 
 		lastSeq, err := j.repo.GetLastSequence(context.Background(), "redis:11")
 		assert.Equal(t, nil, err)
 		assert.Equal(t, true, lastSeq.Valid)
 		assert.Equal(t, int64(0), lastSeq.Int64)
-
-		j.waitCompleted()
 	})
 
 	t.Run("do delete on redis", func(t *testing.T) {
@@ -156,6 +156,7 @@ func TestInvalidatorJob(t *testing.T) {
 		j.inv.Notify()
 
 		time.Sleep(500 * time.Millisecond)
+		j.waitCompleted()
 
 		lastSeq, err := j.repo.GetLastSequence(context.Background(), "redis:11")
 		assert.Equal(t, nil, err)
@@ -173,7 +174,44 @@ func TestInvalidatorJob(t *testing.T) {
 		val, err = client2.Get(context.Background(), "key03").Result()
 		assert.Equal(t, redis.Nil, err)
 		assert.Equal(t, "", val)
+	})
+
+	t.Run("do retention", func(t *testing.T) {
+		j := newJobTest(t,
+			cacheinv.WithRunnerOptions(eventx.WithCoreStoredEventsSize(512)),
+			cacheinv.WithRetentionOptions(
+				eventx.WithMaxTotalEvents(64),
+				eventx.WithDeleteBatchSize(4),
+			),
+			cacheinv.WithRetryConsumerOptions(eventx.WithRetryConsumerFetchLimit(32)),
+		)
+
+		j.run()
+
+		for i := 0; i < 128; i++ {
+			j.insertEvents(
+				cacheinv.InvalidateEvent{
+					Data: "key01,key02",
+				},
+			)
+		}
+
+		j.inv.Notify()
+
+		time.Sleep(2000 * time.Millisecond)
 
 		j.waitCompleted()
+
+		lastSeq, err := j.repo.GetLastSequence(context.Background(), "redis:11")
+		assert.Equal(t, nil, err)
+		assert.Equal(t, int64(128), lastSeq.Int64)
+
+		minSeq, err := j.repo.GetMinSequence(context.Background())
+		assert.Equal(t, nil, err)
+		assert.Greater(t, minSeq.Int64, int64(128-64-5))
+
+		lastSeq, err = j.repo.GetLastSequence(context.Background(), "redis:12")
+		assert.Equal(t, nil, err)
+		assert.Equal(t, int64(128), lastSeq.Int64)
 	})
 }
