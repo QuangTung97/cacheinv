@@ -13,6 +13,7 @@ install-tools:
 
 test:
 	go test -p 1 -count=1 -covermode=count -coverprofile=coverage.out ./...
+	git diff --exit-code # check if things changed
 
 test-race:
 	go test -p 1 -race -count=1 ./...

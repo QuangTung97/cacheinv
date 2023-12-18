@@ -1,0 +1,63 @@
+package server
+
+import (
+	"fmt"
+
+	"github.com/jmoiron/sqlx"
+	"github.com/redis/go-redis/v9"
+
+	"github.com/QuangTung97/cacheinv"
+	"github.com/QuangTung97/cacheinv/config"
+	"github.com/QuangTung97/cacheinv/mysql"
+	cache_client "github.com/QuangTung97/cacheinv/redis"
+
+	_ "github.com/go-sql-driver/mysql" // import mysql driver
+)
+
+func printSep() {
+	fmt.Println("----------------------------------")
+}
+
+func initRepo(conf config.Config) cacheinv.Repository {
+	printSep()
+	fmt.Println("Connect to MySQL:", conf.MySQL.PrintDSN())
+	fmt.Println("MySQL MaxOpenConns:", conf.MySQL.MaxOpenConns)
+	fmt.Println("MySQL MaxIdleConns:", conf.MySQL.MaxIdleConns)
+
+	db := sqlx.MustOpen("mysql", conf.MySQL.DSN())
+	db.SetMaxOpenConns(int(conf.MySQL.MaxOpenConns))
+	db.SetMaxIdleConns(int(conf.MySQL.MaxIdleConns))
+
+	fmt.Println("event_table_name:", conf.EventTableName)
+	fmt.Println("offset_table_name:", conf.OffsetTableName)
+
+	return mysql.NewRepository(db, conf.EventTableName, conf.OffsetTableName)
+}
+
+func initClient(conf config.Config) cacheinv.Client {
+	printSep()
+
+	clients := map[int64]*redis.Client{}
+
+	for _, redisConf := range conf.RedisServers {
+		fmt.Printf("Connect to Redis: '%s'\n", redisConf.Addr)
+		redisClient := redis.NewClient(&redis.Options{
+			Addr: redisConf.Addr,
+		})
+		clients[int64(redisConf.ID)] = redisClient
+	}
+
+	return cache_client.NewClient(clients)
+}
+
+// Start ...
+func Start() {
+	conf := config.Load()
+
+	repo := initRepo(conf)
+	client := initClient(conf)
+
+	cacheinv.NewInvalidatorJob(
+		repo, client,
+	)
+}

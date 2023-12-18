@@ -1,0 +1,24 @@
+http_port: 11080
+
+event_table_name: invalidate_events
+offset_table_name: invalidate_offsets
+
+db_type: mysql
+mysql:
+  host: localhost
+  port: 3306
+  database: cache_inv
+  username: root
+  password: 1
+  options: 'parseTime=true'
+  max_open_conns: 10
+  max_idle_conns: 5
+
+client_type: redis
+redis_num_servers: 2
+
+redis_server_1_id: 11
+redis_server_1_addr: localhost:6379
+
+redis_server_2_id: 12
+redis_server_2_addr: localhost:6380
