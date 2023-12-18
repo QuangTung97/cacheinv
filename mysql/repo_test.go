@@ -49,7 +49,7 @@ func newRepoTest() *repoTest {
 	return &repoTest{
 		ctx:  context.Background(),
 		db:   db,
-		repo: NewRepository(db),
+		repo: NewRepository(db, "invalidate_events", "invalidate_offsets"),
 	}
 }
 
@@ -344,7 +344,7 @@ func newRepoTestWithError() *repoTest {
 	return &repoTest{
 		ctx:  context.Background(),
 		db:   db,
-		repo: NewRepository(db),
+		repo: NewRepository(db, "invalidate_events", "invalidate_offsets"),
 	}
 }
 

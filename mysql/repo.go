@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
 	"sort"
 
 	"github.com/jmoiron/sqlx"
@@ -12,25 +13,33 @@ import (
 )
 
 type repoImpl struct {
-	db *sqlx.DB
+	db              *sqlx.DB
+	eventTableName  string
+	offsetTableName string
 }
 
 var _ cacheinv.Repository = &repoImpl{}
 
-func NewRepository(db *sqlx.DB) cacheinv.Repository {
+func NewRepository(
+	db *sqlx.DB,
+	eventTableName string,
+	offsetTableName string,
+) cacheinv.Repository {
 	return &repoImpl{
-		db: db,
+		db:              db,
+		eventTableName:  eventTableName,
+		offsetTableName: offsetTableName,
 	}
 }
 
 // GetLastEvents returns top *limit* events (events with the highest sequence numbers),
 // by sequence number in ascending order, ignore events with null sequence number
 func (r *repoImpl) GetLastEvents(ctx context.Context, limit uint64) ([]cacheinv.InvalidateEvent, error) {
-	query := `
-SELECT id, seq, data FROM invalidate_events
+	query := fmt.Sprintf(`
+SELECT id, seq, data FROM %s
 WHERE seq IS NOT NULL
 ORDER BY seq DESC LIMIT ?
-`
+`, r.eventTableName)
 	var result []cacheinv.InvalidateEvent
 	err := r.db.SelectContext(ctx, &result, query, limit)
 	if err != nil {
@@ -46,11 +55,11 @@ ORDER BY seq DESC LIMIT ?
 // *AND* have NULL sequence numbers, in ascending order of event *id*
 // size of the list is limited by *limit*
 func (r *repoImpl) GetUnprocessedEvents(ctx context.Context, limit uint64) ([]cacheinv.InvalidateEvent, error) {
-	query := `
-SELECT id, seq, data FROM invalidate_events
+	query := fmt.Sprintf(`
+SELECT id, seq, data FROM %s
 WHERE seq IS NULL
 ORDER BY id LIMIT ?
-`
+`, r.eventTableName)
 	var result []cacheinv.InvalidateEvent
 	err := r.db.SelectContext(ctx, &result, query, limit)
 	return result, err
@@ -60,11 +69,11 @@ ORDER BY id LIMIT ?
 // in ascending order of event sequence numbers, ignoring events with null sequence numbers
 // size of the list is limited by *limit*
 func (r *repoImpl) GetEventsFrom(ctx context.Context, from uint64, limit uint64) ([]cacheinv.InvalidateEvent, error) {
-	query := `
-SELECT id, seq, data FROM invalidate_events
+	query := fmt.Sprintf(`
+SELECT id, seq, data FROM %s
 WHERE seq >= ?
 ORDER BY seq LIMIT ?
-`
+`, r.eventTableName)
 	var result []cacheinv.InvalidateEvent
 	err := r.db.SelectContext(ctx, &result, query, from, limit)
 	return result, err
@@ -76,11 +85,11 @@ func (r *repoImpl) UpdateSequences(ctx context.Context, events []cacheinv.Invali
 		return nil
 	}
 
-	query := `
-INSERT INTO invalidate_events (id, seq, data)
+	query := fmt.Sprintf(`
+INSERT INTO %s (id, seq, data)
 VALUES (:id, :seq, '')
 ON DUPLICATE KEY UPDATE seq = IF(seq IS NULL, VALUES(seq), 'error')
-`
+`, r.eventTableName)
 	_, err := r.db.NamedExecContext(ctx, query, events)
 	return err
 }
@@ -88,7 +97,7 @@ ON DUPLICATE KEY UPDATE seq = IF(seq IS NULL, VALUES(seq), 'error')
 // GetMinSequence returns the min sequence number of all events (except events with null sequence numbers)
 // returns null if no events with sequence number existed
 func (r *repoImpl) GetMinSequence(ctx context.Context) (sql.NullInt64, error) {
-	query := `SELECT MIN(seq) FROM invalidate_events`
+	query := fmt.Sprintf(`SELECT MIN(seq) FROM %s`, r.eventTableName)
 	var result sql.NullInt64
 	err := r.db.GetContext(ctx, &result, query)
 	return result, err
@@ -96,7 +105,7 @@ func (r *repoImpl) GetMinSequence(ctx context.Context) (sql.NullInt64, error) {
 
 // DeleteEventsBefore deletes events with sequence number < *beforeSeq*
 func (r *repoImpl) DeleteEventsBefore(ctx context.Context, beforeSeq uint64) error {
-	query := `SELECT id FROM invalidate_events WHERE seq = ?`
+	query := fmt.Sprintf(`SELECT id FROM %s WHERE seq = ?`, r.eventTableName)
 	var selectedID int64
 	err := r.db.GetContext(ctx, &selectedID, query, beforeSeq)
 	if err != nil {
@@ -106,7 +115,7 @@ func (r *repoImpl) DeleteEventsBefore(ctx context.Context, beforeSeq uint64) err
 		return err
 	}
 
-	_, err = r.db.ExecContext(ctx, `DELETE FROm invalidate_events WHERE id < ?`, selectedID)
+	_, err = r.db.ExecContext(ctx, fmt.Sprintf(`DELETE FROm %s WHERE id < ?`, r.eventTableName), selectedID)
 	return err
 }
 
@@ -118,10 +127,10 @@ type InvalidateOffset struct {
 
 // GetLastSequence get from invalidate_offsets table
 func (r *repoImpl) GetLastSequence(ctx context.Context, serverName string) (sql.NullInt64, error) {
-	query := `
-SELECT server_name, last_seq FROM invalidate_offsets
+	query := fmt.Sprintf(`
+SELECT server_name, last_seq FROM %s
 WHERE server_name = ?
-`
+`, r.offsetTableName)
 	var result InvalidateOffset
 	err := r.db.GetContext(ctx, &result, query, serverName)
 	if err != nil {
@@ -138,11 +147,11 @@ WHERE server_name = ?
 
 // SetLastSequence upsert into invalidate_offsets table
 func (r *repoImpl) SetLastSequence(ctx context.Context, serverName string, seq int64) error {
-	query := `
-INSERT INTO invalidate_offsets (server_name, last_seq)
+	query := fmt.Sprintf(`
+INSERT INTO %s (server_name, last_seq)
 VALUES (:server_name, :last_seq)
 ON DUPLICATE KEY UPDATE last_seq = VALUES(last_seq)
-`
+`, r.offsetTableName)
 	_, err := r.db.NamedExecContext(ctx, query, InvalidateOffset{
 		ServerName: serverName,
 		LastSeq:    seq,
