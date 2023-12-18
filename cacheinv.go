@@ -153,6 +153,7 @@ func (j *InvalidatorJob) runConsumers(wg *sync.WaitGroup) {
 	}
 }
 
+// Run ...
 func (j *InvalidatorJob) Run() {
 	var wg sync.WaitGroup
 
@@ -175,6 +176,7 @@ func (j *InvalidatorJob) Run() {
 	wg.Wait()
 }
 
+// Shutdown ...
 func (j *InvalidatorJob) Shutdown() {
 	j.cancel()
 }

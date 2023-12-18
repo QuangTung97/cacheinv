@@ -20,6 +20,7 @@ type repoImpl struct {
 
 var _ cacheinv.Repository = &repoImpl{}
 
+// NewRepository ...
 func NewRepository(
 	db *sqlx.DB,
 	eventTableName string,
@@ -157,5 +158,4 @@ ON DUPLICATE KEY UPDATE last_seq = VALUES(last_seq)
 		LastSeq:    seq,
 	})
 	return err
-
 }
