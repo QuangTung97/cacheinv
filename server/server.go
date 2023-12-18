@@ -101,6 +101,7 @@ func startJobAndServer(
 ) {
 	printSep()
 	fmt.Printf("Listen HTTP on Port: %d\n", conf.HTTPPort)
+	fmt.Println("Access Token Len:", len(conf.NotifyAccessToken))
 
 	httpServer := &http.Server{
 		Addr:    fmt.Sprintf(":%d", conf.HTTPPort),
