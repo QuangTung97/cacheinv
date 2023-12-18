@@ -35,7 +35,7 @@ func NewClient(clients map[int64]*redis.Client) cacheinv.Client {
 
 // GetServerIDs ...
 func (c *clientImpl) GetServerIDs() []int64 {
-	return nil
+	return c.serverIDs
 }
 
 // GetServerName ...
@@ -45,5 +45,5 @@ func (c *clientImpl) GetServerName(serverID int64) string {
 
 // DeleteCacheKeys ...
 func (c *clientImpl) DeleteCacheKeys(ctx context.Context, serverID int64, keys []string) error {
-	return nil
+	return c.clients[serverID].Del(ctx, keys...).Err()
 }
