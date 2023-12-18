@@ -3,6 +3,7 @@ package mysql
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"sort"
 
 	"github.com/jmoiron/sqlx"
@@ -71,6 +72,10 @@ ORDER BY seq LIMIT ?
 
 // UpdateSequences updates only sequence numbers of *events*
 func (r *repoImpl) UpdateSequences(ctx context.Context, events []cacheinv.InvalidateEvent) error {
+	if len(events) == 0 {
+		return nil
+	}
+
 	query := `
 INSERT INTO invalidate_events (id, seq, data)
 VALUES (:id, :seq, '')
@@ -83,12 +88,26 @@ ON DUPLICATE KEY UPDATE seq = IF(seq IS NULL, VALUES(seq), 'error')
 // GetMinSequence returns the min sequence number of all events (except events with null sequence numbers)
 // returns null if no events with sequence number existed
 func (r *repoImpl) GetMinSequence(ctx context.Context) (sql.NullInt64, error) {
-	return sql.NullInt64{}, nil
+	query := `SELECT MIN(seq) FROM invalidate_events`
+	var result sql.NullInt64
+	err := r.db.GetContext(ctx, &result, query)
+	return result, err
 }
 
 // DeleteEventsBefore deletes events with sequence number < *beforeSeq*
 func (r *repoImpl) DeleteEventsBefore(ctx context.Context, beforeSeq uint64) error {
-	return nil
+	query := `SELECT id FROM invalidate_events WHERE seq = ?`
+	var selectedID int64
+	err := r.db.GetContext(ctx, &selectedID, query, beforeSeq)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil
+		}
+		return err
+	}
+
+	_, err = r.db.ExecContext(ctx, `DELETE FROm invalidate_events WHERE id < ?`, selectedID)
+	return err
 }
 
 // GetLastSequence get from invalidate_offsets table

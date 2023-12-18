@@ -6,6 +6,7 @@ replace github.com/QuangTung97/cacheinv => ../
 
 require (
 	github.com/QuangTung97/cacheinv v0.0.0-00010101000000-000000000000
+	github.com/QuangTung97/eventx v0.5.0
 	github.com/go-sql-driver/mysql v1.6.0
 	github.com/jmoiron/sqlx v1.3.5
 	github.com/stretchr/testify v1.8.4
@@ -13,7 +14,6 @@ require (
 
 require (
 	github.com/BurntSushi/toml v1.3.2 // indirect
-	github.com/QuangTung97/eventx v0.5.0 // indirect
 	github.com/chavacava/garif v0.1.0 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/fatih/color v1.15.0 // indirect

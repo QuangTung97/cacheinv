@@ -117,6 +117,10 @@ func TestRepo_Eventx_Repo(t *testing.T) {
 			e1, e2,
 		}, events)
 
+		minSeq, err := r.repo.GetMinSequence(r.ctx)
+		assert.Equal(t, nil, err)
+		assert.Equal(t, sql.NullInt64{}, minSeq)
+
 		// Do update sequence
 		e1.Seq = newInt64(11)
 		e2.Seq = newInt64(12)
@@ -167,6 +171,13 @@ func TestRepo_Eventx_Repo(t *testing.T) {
 		assert.Equal(t, []cacheinv.InvalidateEvent{
 			e2, e3,
 		}, events)
+
+		minSeq, err = r.repo.GetMinSequence(r.ctx)
+		assert.Equal(t, nil, err)
+		assert.Equal(t, sql.NullInt64{
+			Valid: true,
+			Int64: 11,
+		}, minSeq)
 	})
 
 	t.Run("from lib", func(t *testing.T) {
@@ -197,5 +208,77 @@ func TestRepo_Eventx_Repo(t *testing.T) {
 				r.db.MustExec(`TRUNCATE invalidate_events`)
 			},
 		)
+	})
+
+	t.Run("delete events", func(t *testing.T) {
+		r := newRepoTest()
+
+		e1 := cacheinv.InvalidateEvent{
+			Data: "key01,key02",
+		}
+		e2 := cacheinv.InvalidateEvent{
+			Data: "key03,key04",
+		}
+		e3 := cacheinv.InvalidateEvent{
+			Data: "key05",
+		}
+		e4 := cacheinv.InvalidateEvent{
+			Data: "key06",
+		}
+
+		minSeq, err := r.repo.GetMinSequence(r.ctx)
+		assert.Equal(t, nil, err)
+		assert.Equal(t, sql.NullInt64{}, minSeq)
+
+		r.insertEvents(e1, e2, e3, e4)
+
+		e1.ID = 1
+		e2.ID = 2
+		e3.ID = 3
+		e4.ID = 4
+
+		e1.Seq = newInt64(11)
+		e2.Seq = newInt64(12)
+		e3.Seq = newInt64(13)
+		e4.Seq = newInt64(14)
+
+		err = r.repo.UpdateSequences(r.ctx, []cacheinv.InvalidateEvent{e1, e2, e3, e4})
+		assert.Equal(t, nil, err)
+
+		minSeq, err = r.repo.GetMinSequence(r.ctx)
+		assert.Equal(t, nil, err)
+		assert.Equal(t, sql.NullInt64{
+			Valid: true,
+			Int64: 11,
+		}, minSeq)
+
+		// delete no events
+		err = r.repo.DeleteEventsBefore(r.ctx, 10)
+		assert.Equal(t, nil, err)
+
+		minSeq, err = r.repo.GetMinSequence(r.ctx)
+		assert.Equal(t, nil, err)
+		assert.Equal(t, sql.NullInt64{
+			Valid: true,
+			Int64: 11,
+		}, minSeq)
+
+		// delete with events
+		err = r.repo.DeleteEventsBefore(r.ctx, 13)
+		assert.Equal(t, nil, err)
+
+		minSeq, err = r.repo.GetMinSequence(r.ctx)
+		assert.Equal(t, nil, err)
+		assert.Equal(t, sql.NullInt64{
+			Valid: true,
+			Int64: 13,
+		}, minSeq)
+	})
+
+	t.Run("empty", func(t *testing.T) {
+		r := newRepoTest()
+
+		err := r.repo.UpdateSequences(r.ctx, nil)
+		assert.Equal(t, nil, err)
 	})
 }
