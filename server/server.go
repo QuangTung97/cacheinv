@@ -1,8 +1,17 @@
 package server
 
 import (
+	"context"
+	"errors"
 	"fmt"
+	"net/http"
+	"os"
+	"os/signal"
+	"sync"
+	"syscall"
+	"time"
 
+	"github.com/dustin/go-humanize"
 	"github.com/jmoiron/sqlx"
 	"github.com/redis/go-redis/v9"
 
@@ -57,7 +66,55 @@ func Start() {
 	repo := initRepo(conf)
 	client := initClient(conf)
 
-	cacheinv.NewInvalidatorJob(
+	printSep()
+	if conf.EventRetentionSize <= 1000 {
+		panic("event_retention_size is too small")
+	}
+	fmt.Println("Event Retention Size:", humanize.FormatInteger("#,###.", int(conf.EventRetentionSize)))
+	job := cacheinv.NewInvalidatorJob(
 		repo, client,
 	)
+
+	printSep()
+	httpServer := &http.Server{
+		Addr: fmt.Sprintf(":%d", conf.HTTPPort),
+	}
+	fmt.Printf("Listen HTTP on Port: %d\n", conf.HTTPPort)
+
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGKILL)
+
+	var wg sync.WaitGroup
+	wg.Add(2)
+
+	go func() {
+		defer wg.Done()
+		job.Run()
+	}()
+
+	go func() {
+		defer wg.Done()
+		err := httpServer.ListenAndServe()
+		if errors.Is(err, http.ErrServerClosed) {
+			return
+		}
+		if err != nil {
+			panic(err)
+		}
+	}()
+
+	<-sigChan
+
+	job.Shutdown()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	err := httpServer.Shutdown(ctx)
+	if err != nil {
+		panic(err)
+	}
+
+	wg.Wait()
+
+	fmt.Println("Graceful Shutdown Completed")
 }

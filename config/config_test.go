@@ -50,6 +50,8 @@ func TestLoadConfig(t *testing.T) {
 		EventTableName:  "invalidate_events",
 		OffsetTableName: "invalidate_offsets",
 
+		EventRetentionSize: 10_000_000,
+
 		DBType: DBTypeMySQL,
 		MySQL: MySQLConfig{
 			Host:         "localhost",

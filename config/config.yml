@@ -3,6 +3,8 @@ http_port: 11080
 event_table_name: invalidate_events
 offset_table_name: invalidate_offsets
 
+event_retention_size: 10_000_000
+
 db_type: mysql
 mysql:
   host: localhost

@@ -15,6 +15,8 @@ type Config struct {
 	EventTableName  string `mapstructure:"event_table_name"`
 	OffsetTableName string `mapstructure:"offset_table_name"`
 
+	EventRetentionSize uint32 `mapstructure:"event_retention_size"`
+
 	DBType DBType      `mapstructure:"db_type"`
 	MySQL  MySQLConfig `mapstructure:"mysql"`
 
