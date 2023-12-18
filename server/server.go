@@ -13,6 +13,7 @@ import (
 
 	"github.com/dustin/go-humanize"
 	"github.com/jmoiron/sqlx"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/redis/go-redis/v9"
 
 	"github.com/QuangTung97/cacheinv"
@@ -75,9 +76,17 @@ func Start() {
 		repo, client,
 	)
 
+	mux := &http.ServeMux{}
+	mux.Handle("/metrics", promhttp.Handler())
+	mux.HandleFunc("/notify", func(writer http.ResponseWriter, request *http.Request) {
+		job.Notify()
+		_, _ = writer.Write([]byte("Success"))
+	})
+
 	printSep()
 	httpServer := &http.Server{
-		Addr: fmt.Sprintf(":%d", conf.HTTPPort),
+		Addr:    fmt.Sprintf(":%d", conf.HTTPPort),
+		Handler: mux,
 	}
 	fmt.Printf("Listen HTTP on Port: %d\n", conf.HTTPPort)
 
