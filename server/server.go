@@ -79,16 +79,33 @@ func Start() {
 	mux := &http.ServeMux{}
 	mux.Handle("/metrics", promhttp.Handler())
 	mux.HandleFunc("/notify", func(writer http.ResponseWriter, request *http.Request) {
+		if len(conf.NotifyAccessToken) > 0 {
+			val := request.Header.Get("X-Notify-Access-Token")
+			if val != conf.NotifyAccessToken {
+				writer.WriteHeader(http.StatusForbidden)
+				_, _ = writer.Write([]byte("Invalid access token"))
+				return
+			}
+		}
+
 		job.Notify()
 		_, _ = writer.Write([]byte("Success"))
 	})
 
+	startJobAndServer(conf, mux, job)
+}
+
+func startJobAndServer(
+	conf config.Config, mux *http.ServeMux,
+	job *cacheinv.InvalidatorJob,
+) {
 	printSep()
+	fmt.Printf("Listen HTTP on Port: %d\n", conf.HTTPPort)
+
 	httpServer := &http.Server{
 		Addr:    fmt.Sprintf(":%d", conf.HTTPPort),
 		Handler: mux,
 	}
-	fmt.Printf("Listen HTTP on Port: %d\n", conf.HTTPPort)
 
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGKILL)

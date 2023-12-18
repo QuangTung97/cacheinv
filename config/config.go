@@ -17,6 +17,8 @@ type Config struct {
 
 	EventRetentionSize uint32 `mapstructure:"event_retention_size"`
 
+	NotifyAccessToken string `mapstructure:"notify_access_token"`
+
 	DBType DBType      `mapstructure:"db_type"`
 	MySQL  MySQLConfig `mapstructure:"mysql"`
 

@@ -51,6 +51,7 @@ func TestLoadConfig(t *testing.T) {
 		OffsetTableName: "invalidate_offsets",
 
 		EventRetentionSize: 10_000_000,
+		NotifyAccessToken:  "ABCXYZ",
 
 		DBType: DBTypeMySQL,
 		MySQL: MySQLConfig{

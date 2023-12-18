@@ -5,6 +5,8 @@ offset_table_name: invalidate_offsets
 
 event_retention_size: 10_000_000
 
+notify_access_token: ABCXYZ # pass to http header: X-Notify-Access-Token
+
 db_type: mysql
 mysql:
   host: localhost
