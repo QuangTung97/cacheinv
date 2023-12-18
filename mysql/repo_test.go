@@ -282,3 +282,106 @@ func TestRepo_Eventx_Repo(t *testing.T) {
 		assert.Equal(t, nil, err)
 	})
 }
+
+func TestRepo_Repo_Offsets(t *testing.T) {
+	const server1 = "SERVER01"
+	const server2 = "SERVER02"
+
+	t.Run("normal", func(t *testing.T) {
+		r := newRepoTest()
+
+		lastSeq, err := r.repo.GetLastSequence(r.ctx, server1)
+		assert.Equal(t, nil, err)
+		assert.Equal(t, sql.NullInt64{}, lastSeq)
+
+		err = r.repo.SetLastSequence(r.ctx, server1, 11)
+		assert.Equal(t, nil, err)
+
+		lastSeq, err = r.repo.GetLastSequence(r.ctx, server1)
+		assert.Equal(t, nil, err)
+		assert.Equal(t, sql.NullInt64{
+			Valid: true,
+			Int64: 11,
+		}, lastSeq)
+
+		// server 2
+		lastSeq, err = r.repo.GetLastSequence(r.ctx, server2)
+		assert.Equal(t, nil, err)
+		assert.Equal(t, sql.NullInt64{}, lastSeq)
+
+		err = r.repo.SetLastSequence(r.ctx, server2, 21)
+		assert.Equal(t, nil, err)
+
+		lastSeq, err = r.repo.GetLastSequence(r.ctx, server2)
+		assert.Equal(t, nil, err)
+		assert.Equal(t, sql.NullInt64{
+			Valid: true,
+			Int64: 21,
+		}, lastSeq)
+	})
+}
+
+var dbErrorOnce sync.Once
+var globalDBError *sqlx.DB
+
+func initDBWithError() *sqlx.DB {
+	dbErrorOnce.Do(func() {
+		var err error
+		globalDBError, err = sqlx.Open(
+			"mysql",
+			"root:1@tcp(localhost:3307)/cache_inv?parseTime=true&multiStatements=true",
+		)
+		if err != nil {
+			panic(err)
+		}
+	})
+	return globalDBError
+}
+
+func newRepoTestWithError() *repoTest {
+	db := initDBWithError()
+
+	return &repoTest{
+		ctx:  context.Background(),
+		db:   db,
+		repo: NewRepository(db),
+	}
+}
+
+func TestRepo_Repo_WithError(t *testing.T) {
+	t.Run("normal", func(t *testing.T) {
+		r := newRepoTestWithError()
+
+		var err error
+
+		_, err = r.repo.GetLastEvents(r.ctx, 16)
+		assert.Error(t, err)
+
+		_, err = r.repo.GetUnprocessedEvents(r.ctx, 16)
+		assert.Error(t, err)
+
+		_, err = r.repo.GetEventsFrom(r.ctx, 100, 16)
+		assert.Error(t, err)
+
+		err = r.repo.UpdateSequences(r.ctx, []cacheinv.InvalidateEvent{
+			{
+				ID:   1,
+				Seq:  newInt64(11),
+				Data: "Key01",
+			},
+		})
+		assert.Error(t, err)
+
+		_, err = r.repo.GetMinSequence(r.ctx)
+		assert.Error(t, err)
+
+		err = r.repo.DeleteEventsBefore(r.ctx, 100)
+		assert.Error(t, err)
+
+		_, err = r.repo.GetLastSequence(r.ctx, "server01")
+		assert.Error(t, err)
+
+		err = r.repo.SetLastSequence(r.ctx, "server01", 70)
+		assert.Error(t, err)
+	})
+}

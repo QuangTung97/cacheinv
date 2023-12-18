@@ -110,12 +110,43 @@ func (r *repoImpl) DeleteEventsBefore(ctx context.Context, beforeSeq uint64) err
 	return err
 }
 
+// InvalidateOffset ...
+type InvalidateOffset struct {
+	ServerName string `db:"server_name"`
+	LastSeq    int64  `db:"last_seq"`
+}
+
 // GetLastSequence get from invalidate_offsets table
 func (r *repoImpl) GetLastSequence(ctx context.Context, serverName string) (sql.NullInt64, error) {
-	return sql.NullInt64{}, nil
+	query := `
+SELECT server_name, last_seq FROM invalidate_offsets
+WHERE server_name = ?
+`
+	var result InvalidateOffset
+	err := r.db.GetContext(ctx, &result, query, serverName)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return sql.NullInt64{}, nil
+		}
+		return sql.NullInt64{}, err
+	}
+	return sql.NullInt64{
+		Valid: true,
+		Int64: result.LastSeq,
+	}, nil
 }
 
 // SetLastSequence upsert into invalidate_offsets table
 func (r *repoImpl) SetLastSequence(ctx context.Context, serverName string, seq int64) error {
-	return nil
+	query := `
+INSERT INTO invalidate_offsets (server_name, last_seq)
+VALUES (:server_name, :last_seq)
+ON DUPLICATE KEY UPDATE last_seq = VALUES(last_seq)
+`
+	_, err := r.db.NamedExecContext(ctx, query, InvalidateOffset{
+		ServerName: serverName,
+		LastSeq:    seq,
+	})
+	return err
+
 }
