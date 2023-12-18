@@ -75,6 +75,7 @@ type InvalidatorJob struct {
 
 	ctx    context.Context
 	cancel func()
+
 	repo   Repository
 	client Client
 
@@ -83,7 +84,7 @@ type InvalidatorJob struct {
 }
 
 // NewInvalidatorJob ...
-func NewInvalidatorJob(repo Repository, client Client, options []Option) *InvalidatorJob {
+func NewInvalidatorJob(repo Repository, client Client, options ...Option) *InvalidatorJob {
 	conf := newJobConfig(options)
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -93,6 +94,7 @@ func NewInvalidatorJob(repo Repository, client Client, options []Option) *Invali
 
 		ctx:    ctx,
 		cancel: cancel,
+
 		repo:   repo,
 		client: client,
 	}
@@ -175,6 +177,11 @@ func (j *InvalidatorJob) Run() {
 	}()
 
 	wg.Wait()
+}
+
+// Notify ...
+func (j *InvalidatorJob) Notify() {
+	j.runner.Signal()
 }
 
 // Shutdown ...
