@@ -26,6 +26,8 @@ Disabled = true
 Disabled = true
 [rule.package-comments]
 Disabled = true
+[rule.import-alias-naming]
+Disabled = true
 
 # Rule tuning
 [rule.argument-limit]
