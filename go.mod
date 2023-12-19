@@ -3,7 +3,7 @@ module github.com/QuangTung97/cacheinv
 go 1.19
 
 require (
-	github.com/QuangTung97/eventx v0.5.0
+	github.com/QuangTung97/eventx v0.5.1
 	github.com/dustin/go-humanize v1.0.1
 	github.com/go-sql-driver/mysql v1.7.1
 	github.com/jmoiron/sqlx v1.3.5

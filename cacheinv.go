@@ -3,6 +3,7 @@ package cacheinv
 import (
 	"context"
 	"database/sql"
+	"log"
 	"strings"
 	"sync"
 
@@ -85,6 +86,11 @@ type InvalidatorJob struct {
 	retention *eventx.RetentionJob[InvalidateEvent]
 }
 
+var invalidatorJobErrorTotal = promauto.NewCounterVec(prometheus.CounterOpts{
+	Name: "invalidator_job_error_total",
+	Help: "number of errors happened",
+}, []string{"service_type"})
+
 // NewInvalidatorJob ...
 func NewInvalidatorJob(repo Repository, client Client, options ...Option) *InvalidatorJob {
 	conf := newJobConfig(options)
@@ -101,6 +107,14 @@ func NewInvalidatorJob(repo Repository, client Client, options ...Option) *Inval
 		client: client,
 	}
 
+	runnerOptions := []eventx.Option{
+		eventx.WithErrorLogger(func(err error) {
+			log.Println("[ERROR] eventx runner:", err)
+			invalidatorJobErrorTotal.WithLabelValues("core").Add(1)
+		}),
+	}
+	runnerOptions = append(runnerOptions, conf.runnerOptions...)
+
 	j.runner = eventx.NewRunner[InvalidateEvent](
 		repo,
 		func(event *InvalidateEvent, seq uint64) {
@@ -109,13 +123,21 @@ func NewInvalidatorJob(repo Repository, client Client, options ...Option) *Inval
 				Int64: int64(seq),
 			}
 		},
-		conf.runnerOptions...,
+		runnerOptions...,
 	)
+
+	retentionOptions := []eventx.RetentionOption{
+		eventx.WithRetentionErrorLogger(func(err error) {
+			log.Println("[ERROR] retention job:", err)
+			invalidatorJobErrorTotal.WithLabelValues("retention").Add(1)
+		}),
+	}
+	retentionOptions = append(retentionOptions, conf.retentionOptions...)
 
 	j.retention = eventx.NewRetentionJob[InvalidateEvent](
 		j.runner,
 		repo,
-		conf.retentionOptions...,
+		retentionOptions...,
 	)
 
 	return j
