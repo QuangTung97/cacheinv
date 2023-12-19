@@ -122,6 +122,8 @@ func loadConfigWithViper(vip *viper.Viper) Config {
 		})
 	}
 
+	cfg.validateRedisServers()
+
 	return cfg
 }
 
@@ -138,4 +140,15 @@ func (c MySQLConfig) dsnWithPass(pass string) string {
 // PrintDSN ...
 func (c MySQLConfig) PrintDSN() string {
 	return c.dsnWithPass("[SECRET]")
+}
+
+func (c Config) validateRedisServers() {
+	serverIDs := map[uint32]struct{}{}
+	for _, s := range c.RedisServers {
+		_, existed := serverIDs[s.ID]
+		if existed {
+			panic(fmt.Sprintf("duplicated redis server id '%d'", s.ID))
+		}
+		serverIDs[s.ID] = struct{}{}
+	}
 }

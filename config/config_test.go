@@ -82,3 +82,15 @@ func TestLoadConfig(t *testing.T) {
 		},
 	}, conf)
 }
+
+func TestValidateServerIDs(t *testing.T) {
+	c := Config{
+		RedisServers: []RedisConfig{
+			{ID: 11},
+			{ID: 11},
+		},
+	}
+	assert.PanicsWithValue(t, "duplicated redis server id '11'", func() {
+		c.validateRedisServers()
+	})
+}
