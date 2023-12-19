@@ -8,6 +8,8 @@ import (
 	"sort"
 
 	"github.com/jmoiron/sqlx"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promauto"
 
 	"github.com/QuangTung97/cacheinv"
 )
@@ -34,21 +36,28 @@ func NewRepository(
 }
 
 // GetLastEvents returns top *limit* events (events with the highest sequence numbers),
-// by sequence number in ascending order, ignore events with null sequence number
+// by sequence number in ascending order, ignore events with null sequence numbers
 func (r *repoImpl) GetLastEvents(ctx context.Context, limit uint64) ([]cacheinv.InvalidateEvent, error) {
 	query := fmt.Sprintf(`
 SELECT id, seq, data FROM %s
 WHERE seq IS NOT NULL
 ORDER BY seq DESC LIMIT ?
 `, r.eventTableName)
+
 	var result []cacheinv.InvalidateEvent
 	err := r.db.SelectContext(ctx, &result, query, limit)
 	if err != nil {
 		return nil, err
 	}
+
 	sort.Slice(result, func(i, j int) bool {
 		return result[i].Seq.Int64 < result[j].Seq.Int64
 	})
+
+	if len(result) > 0 {
+		eventLastUpdatedSeq.Set(float64(result[len(result)-1].GetSequence()))
+	}
+
 	return result, nil
 }
 
@@ -80,6 +89,11 @@ ORDER BY seq LIMIT ?
 	return result, err
 }
 
+var eventLastUpdatedSeq = promauto.NewGauge(prometheus.GaugeOpts{
+	Name: "event_last_updated_seq",
+	Help: "sequence number of the last updated invalidate_events",
+})
+
 // UpdateSequences updates only sequence numbers of *events*
 func (r *repoImpl) UpdateSequences(ctx context.Context, events []cacheinv.InvalidateEvent) error {
 	if len(events) == 0 {
@@ -92,6 +106,9 @@ VALUES (:id, :seq, '')
 ON DUPLICATE KEY UPDATE seq = IF(seq IS NULL, VALUES(seq), 'error')
 `, r.eventTableName)
 	_, err := r.db.NamedExecContext(ctx, query, events)
+	if err == nil {
+		eventLastUpdatedSeq.Set(float64(events[len(events)-1].GetSequence()))
+	}
 	return err
 }
 
