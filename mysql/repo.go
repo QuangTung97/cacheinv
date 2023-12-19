@@ -94,6 +94,11 @@ var eventLastUpdatedSeq = promauto.NewGauge(prometheus.GaugeOpts{
 	Help: "sequence number of the last updated invalidate_events",
 })
 
+var eventMinRemainingSeq = promauto.NewGauge(prometheus.GaugeOpts{
+	Name: "event_min_remaining_seq",
+	Help: "smallest sequence number after retention",
+})
+
 // UpdateSequences updates only sequence numbers of *events*
 func (r *repoImpl) UpdateSequences(ctx context.Context, events []cacheinv.InvalidateEvent) error {
 	if len(events) == 0 {
@@ -118,6 +123,9 @@ func (r *repoImpl) GetMinSequence(ctx context.Context) (sql.NullInt64, error) {
 	query := fmt.Sprintf(`SELECT MIN(seq) FROM %s`, r.eventTableName)
 	var result sql.NullInt64
 	err := r.db.GetContext(ctx, &result, query)
+	if result.Valid {
+		eventMinRemainingSeq.Set(float64(result.Int64))
+	}
 	return result, err
 }
 
@@ -134,6 +142,9 @@ func (r *repoImpl) DeleteEventsBefore(ctx context.Context, beforeSeq uint64) err
 	}
 
 	_, err = r.db.ExecContext(ctx, fmt.Sprintf(`DELETE FROm %s WHERE id < ?`, r.eventTableName), selectedID)
+	if err == nil {
+		eventMinRemainingSeq.Set(float64(beforeSeq))
+	}
 	return err
 }
 
