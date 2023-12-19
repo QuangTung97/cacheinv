@@ -7,6 +7,8 @@ import (
 	"sync"
 
 	"github.com/QuangTung97/eventx"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promauto"
 )
 
 // =================================
@@ -119,6 +121,44 @@ func NewInvalidatorJob(repo Repository, client Client, options ...Option) *Inval
 	return j
 }
 
+var cacheConsumerLastSeq = promauto.NewGaugeVec(prometheus.GaugeOpts{
+	Name: "cache_consumer_last_seq",
+	Help: "last consumed sequence number for each cache server",
+}, []string{"server_name"})
+
+func (j *InvalidatorJob) runCacheRetryConsumer(serverID int64) {
+	serverName := j.client.GetServerName(serverID)
+
+	consumer := eventx.NewRetryConsumer[InvalidateEvent](
+		j.runner,
+		j.repo,
+		func(ctx context.Context) (sql.NullInt64, error) {
+			lastSeq, err := j.repo.GetLastSequence(j.ctx, serverName)
+			if lastSeq.Valid {
+				cacheConsumerLastSeq.WithLabelValues(serverName).Set(float64(lastSeq.Int64))
+			}
+			return lastSeq, err
+		},
+		func(ctx context.Context, seq uint64) error {
+			err := j.repo.SetLastSequence(j.ctx, serverName, int64(seq))
+			if err == nil {
+				cacheConsumerLastSeq.WithLabelValues(serverName).Set(float64(seq))
+			}
+			return err
+		},
+		func(ctx context.Context, events []InvalidateEvent) error {
+			var keys []string
+			for _, e := range events {
+				keys = append(keys, strings.Split(e.Data, ",")...)
+			}
+			return j.client.DeleteCacheKeys(j.ctx, serverID, keys)
+		},
+		j.conf.retryOptions...,
+	)
+
+	consumer.RunConsumer(j.ctx)
+}
+
 func (j *InvalidatorJob) runConsumers(wg *sync.WaitGroup) {
 	servers := j.client.GetServerIDs()
 
@@ -129,29 +169,7 @@ func (j *InvalidatorJob) runConsumers(wg *sync.WaitGroup) {
 
 		go func() {
 			defer wg.Done()
-
-			serverName := j.client.GetServerName(serverID)
-
-			consumer := eventx.NewRetryConsumer[InvalidateEvent](
-				j.runner,
-				j.repo,
-				func(ctx context.Context) (sql.NullInt64, error) {
-					return j.repo.GetLastSequence(j.ctx, serverName)
-				},
-				func(ctx context.Context, seq uint64) error {
-					return j.repo.SetLastSequence(j.ctx, serverName, int64(seq))
-				},
-				func(ctx context.Context, events []InvalidateEvent) error {
-					var keys []string
-					for _, e := range events {
-						keys = append(keys, strings.Split(e.Data, ",")...)
-					}
-					return j.client.DeleteCacheKeys(j.ctx, serverID, keys)
-				},
-				j.conf.retryOptions...,
-			)
-
-			consumer.RunConsumer(j.ctx)
+			j.runCacheRetryConsumer(serverID)
 		}()
 	}
 }
