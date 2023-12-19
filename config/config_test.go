@@ -3,6 +3,7 @@ package config
 import (
 	"os/exec"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -51,7 +52,9 @@ func TestLoadConfig(t *testing.T) {
 		OffsetTableName: "invalidate_offsets",
 
 		EventRetentionSize: 10_000_000,
-		NotifyAccessToken:  "",
+		DBScanDuration:     30 * time.Second,
+
+		NotifyAccessToken: "",
 
 		DBType: DBTypeMySQL,
 		MySQL: MySQLConfig{

@@ -4,6 +4,7 @@ event_table_name: invalidate_events
 offset_table_name: invalidate_offsets
 
 event_retention_size: 10_000_000
+db_scan_duration: 30s
 
 notify_access_token: '' # pass to http header: X-Notify-Access-Token, not required if empty
 

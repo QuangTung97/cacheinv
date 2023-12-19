@@ -72,9 +72,15 @@ func Start() {
 	if conf.EventRetentionSize <= 10 {
 		panic("event_retention_size is too small")
 	}
+
 	fmt.Println("Event Retention Size:", humanize.FormatInteger("#,###.", int(conf.EventRetentionSize)))
+	fmt.Println("DB Scan Duration:", conf.DBScanDuration)
+
 	job := cacheinv.NewInvalidatorJob(
 		repo, client,
+		cacheinv.WithRunnerOptions(
+			eventx.WithDBProcessorRetryTimer(conf.DBScanDuration),
+		),
 		cacheinv.WithRetentionOptions(
 			eventx.WithMaxTotalEvents(uint64(conf.EventRetentionSize)),
 			eventx.WithDeleteBatchSize(32),

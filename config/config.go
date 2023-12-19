@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/url"
 	"strings"
+	"time"
 
 	"github.com/spf13/viper"
 )
@@ -15,7 +16,8 @@ type Config struct {
 	EventTableName  string `mapstructure:"event_table_name"`
 	OffsetTableName string `mapstructure:"offset_table_name"`
 
-	EventRetentionSize uint32 `mapstructure:"event_retention_size"`
+	EventRetentionSize uint32        `mapstructure:"event_retention_size"`
+	DBScanDuration     time.Duration `mapstructure:"db_scan_duration"`
 
 	NotifyAccessToken string `mapstructure:"notify_access_token"`
 
