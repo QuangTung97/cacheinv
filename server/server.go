@@ -11,6 +11,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/QuangTung97/eventx"
 	"github.com/dustin/go-humanize"
 	"github.com/jmoiron/sqlx"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -68,12 +69,16 @@ func Start() {
 	client := initClient(conf)
 
 	printSep()
-	if conf.EventRetentionSize <= 1000 {
+	if conf.EventRetentionSize <= 10 {
 		panic("event_retention_size is too small")
 	}
 	fmt.Println("Event Retention Size:", humanize.FormatInteger("#,###.", int(conf.EventRetentionSize)))
 	job := cacheinv.NewInvalidatorJob(
 		repo, client,
+		cacheinv.WithRetentionOptions(
+			eventx.WithMaxTotalEvents(uint64(conf.EventRetentionSize)),
+			eventx.WithDeleteBatchSize(32),
+		),
 	)
 
 	mux := &http.ServeMux{}
