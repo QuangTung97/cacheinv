@@ -77,7 +77,12 @@ func Start() {
 	)
 
 	mux := &http.ServeMux{}
+
 	mux.Handle("/metrics", promhttp.Handler())
+
+	mux.HandleFunc("/health/live", healthCheck)
+	mux.HandleFunc("/health/ready", healthCheck)
+
 	mux.HandleFunc("/notify", func(writer http.ResponseWriter, request *http.Request) {
 		if len(conf.NotifyAccessToken) > 0 {
 			val := request.Header.Get("X-Notify-Access-Token")
@@ -93,6 +98,11 @@ func Start() {
 	})
 
 	startJobAndServer(conf, mux, job)
+}
+
+func healthCheck(w http.ResponseWriter, _ *http.Request) {
+	w.Header().Add("Content-Type", "application/json")
+	_, _ = w.Write([]byte(`{"code":0,"message":"Success"}`))
 }
 
 func startJobAndServer(
