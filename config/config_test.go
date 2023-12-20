@@ -58,14 +58,16 @@ func TestLoadConfig(t *testing.T) {
 
 		DBType: DBTypeMySQL,
 		MySQL: MySQLConfig{
-			Host:         "localhost",
-			Port:         3306,
-			Username:     "root",
-			Password:     "1",
-			Database:     "cache_inv",
-			Options:      "parseTime=true",
-			MaxOpenConns: 10,
-			MaxIdleConns: 5,
+			Host:     "localhost",
+			Port:     3306,
+			Username: "root",
+			Password: "1",
+			Database: "cache_inv",
+			Options:  "parseTime=true",
+
+			MaxOpenConns:    10,
+			MaxIdleConns:    5,
+			MaxConnIdleTime: 60 * time.Minute,
 		},
 
 		ClientType:      ClientTypeRedis,

@@ -18,6 +18,7 @@ mysql:
   options: 'parseTime=true'
   max_open_conns: 10
   max_idle_conns: 5
+  max_conn_idle_time: 60m
 
 client_type: redis
 redis_num_servers: 2

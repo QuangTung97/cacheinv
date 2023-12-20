@@ -54,8 +54,9 @@ type MySQLConfig struct {
 	Database string `mapstructure:"database"`
 	Options  string `mapstructure:"options"`
 
-	MaxOpenConns uint32 `mapstructure:"max_open_conns"`
-	MaxIdleConns uint32 `mapstructure:"max_idle_conns"`
+	MaxOpenConns    uint32        `mapstructure:"max_open_conns"`
+	MaxIdleConns    uint32        `mapstructure:"max_idle_conns"`
+	MaxConnIdleTime time.Duration `mapstructure:"max_conn_idle_time"`
 }
 
 // RedisConfig ...

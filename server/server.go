@@ -34,10 +34,12 @@ func initRepo(conf config.Config) cacheinv.Repository {
 	fmt.Println("Connect to MySQL:", conf.MySQL.PrintDSN())
 	fmt.Println("MySQL MaxOpenConns:", conf.MySQL.MaxOpenConns)
 	fmt.Println("MySQL MaxIdleConns:", conf.MySQL.MaxIdleConns)
+	fmt.Println("MySQL Max Conn Idle Time:", conf.MySQL.MaxConnIdleTime)
 
 	db := sqlx.MustOpen("mysql", conf.MySQL.DSN())
 	db.SetMaxOpenConns(int(conf.MySQL.MaxOpenConns))
 	db.SetMaxIdleConns(int(conf.MySQL.MaxIdleConns))
+	db.SetConnMaxIdleTime(conf.MySQL.MaxConnIdleTime)
 
 	fmt.Println("event_table_name:", conf.EventTableName)
 	fmt.Println("offset_table_name:", conf.OffsetTableName)
