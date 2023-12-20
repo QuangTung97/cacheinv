@@ -24,9 +24,13 @@ type Config struct {
 	DBType DBType      `mapstructure:"db_type"`
 	MySQL  MySQLConfig `mapstructure:"mysql"`
 
-	ClientType      ClientType    `mapstructure:"client_type"`
+	ClientType ClientType `mapstructure:"client_type"`
+
 	RedisNumServers int           `mapstructure:"redis_num_servers"`
 	RedisServers    []RedisConfig `mapstructure:"-"`
+
+	MemcacheNumServers int              `mapstructure:"memcache_num_servers"`
+	MemcacheServers    []MemcacheConfig `mapstructure:"-"`
 }
 
 // DBType ...
@@ -43,6 +47,8 @@ type ClientType string
 const (
 	// ClientTypeRedis ...
 	ClientTypeRedis ClientType = "redis"
+	// ClientTypeMemcache ...
+	ClientTypeMemcache ClientType = "memcache"
 )
 
 // MySQLConfig ...
@@ -61,6 +67,12 @@ type MySQLConfig struct {
 
 // RedisConfig ...
 type RedisConfig struct {
+	ID   uint32
+	Addr string
+}
+
+// MemcacheConfig ...
+type MemcacheConfig struct {
 	ID   uint32
 	Addr string
 }
@@ -101,6 +113,15 @@ func loadConfigWithViper(vip *viper.Viper) Config {
 		panic(err)
 	}
 
+	loadRedisServersConfig(&cfg, vip)
+	loadMemcacheServersConfig(&cfg, vip)
+
+	cfg.validateConfig()
+
+	return cfg
+}
+
+func loadRedisServersConfig(cfg *Config, vip *viper.Viper) {
 	for i := 0; i < cfg.RedisNumServers; i++ {
 		key := fmt.Sprintf("redis_server_%d", i+1)
 
@@ -122,10 +143,30 @@ func loadConfigWithViper(vip *viper.Viper) Config {
 			Addr: addr,
 		})
 	}
+}
 
-	cfg.validateRedisServers()
+func loadMemcacheServersConfig(cfg *Config, vip *viper.Viper) {
+	for i := 0; i < cfg.MemcacheNumServers; i++ {
+		key := fmt.Sprintf("memcache_server_%d", i+1)
 
-	return cfg
+		idKey := key + "_id"
+		serverID := vip.GetUint32(idKey)
+
+		addrKey := key + "_addr"
+		addr := vip.GetString(addrKey)
+
+		if serverID == 0 {
+			panic(fmt.Sprintf("missing config key '%s'", idKey))
+		}
+		if len(addr) == 0 {
+			panic(fmt.Sprintf("missing config key '%s'", addrKey))
+		}
+
+		cfg.MemcacheServers = append(cfg.MemcacheServers, MemcacheConfig{
+			ID:   serverID,
+			Addr: addr,
+		})
+	}
 }
 
 // DSN ...
@@ -143,7 +184,20 @@ func (c MySQLConfig) PrintDSN() string {
 	return c.dsnWithPass("[SECRET]")
 }
 
-func (c Config) validateRedisServers() {
+func (c Config) validateConfig() {
+	switch c.ClientType {
+	case ClientTypeRedis:
+		c.validateRedisConfig()
+
+	case ClientTypeMemcache:
+		c.validateMemcacheConfig()
+
+	default:
+		panic(fmt.Sprintf("invalid client type '%s'", c.ClientType))
+	}
+}
+
+func (c Config) validateRedisConfig() {
 	serverIDs := map[uint32]struct{}{}
 	serverAddrs := map[string]struct{}{}
 
@@ -168,6 +222,36 @@ func (c Config) validateRedisServers() {
 		_, existed = serverAddrs[s.Addr]
 		if existed {
 			panic(fmt.Sprintf("duplicated redis server address '%s'", s.Addr))
+		}
+		serverAddrs[s.Addr] = struct{}{}
+	}
+}
+
+func (c Config) validateMemcacheConfig() {
+	serverIDs := map[uint32]struct{}{}
+	serverAddrs := map[string]struct{}{}
+
+	if len(c.MemcacheServers) == 0 {
+		panic("memcache server list must not be empty")
+	}
+
+	for _, s := range c.MemcacheServers {
+		if s.ID <= 0 {
+			panic("memcache server id must not be empty")
+		}
+		if len(s.Addr) == 0 {
+			panic("memcache server address must not be empty")
+		}
+
+		_, existed := serverIDs[s.ID]
+		if existed {
+			panic(fmt.Sprintf("duplicated memcache server id '%d'", s.ID))
+		}
+		serverIDs[s.ID] = struct{}{}
+
+		_, existed = serverAddrs[s.Addr]
+		if existed {
+			panic(fmt.Sprintf("duplicated memcache server address '%s'", s.Addr))
 		}
 		serverAddrs[s.Addr] = struct{}{}
 	}

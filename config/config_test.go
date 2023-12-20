@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -82,35 +83,116 @@ func TestLoadConfig(t *testing.T) {
 				Addr: "localhost:6380",
 			},
 		},
+		MemcacheNumServers: 3,
+		MemcacheServers: []MemcacheConfig{
+			{
+				ID:   21,
+				Addr: "localhost:11211",
+			},
+			{
+				ID:   22,
+				Addr: "localhost:11212",
+			},
+			{
+				ID:   23,
+				Addr: "localhost:11213",
+			},
+		},
 	}, conf)
 }
 
-func TestValidateServerIDs(t *testing.T) {
+func TestLoadRedisServersConfig(t *testing.T) {
+	t.Run("missing id", func(t *testing.T) {
+		vip := viper.New()
+		cfg := Config{
+			RedisNumServers: 1,
+		}
+		assert.PanicsWithValue(t, "missing config key 'redis_server_1_id'", func() {
+			loadRedisServersConfig(&cfg, vip)
+		})
+	})
+
+	t.Run("missing addr", func(t *testing.T) {
+		vip := viper.New()
+		vip.Set("redis_server_1_id", uint32(11))
+
+		cfg := Config{
+			RedisNumServers: 1,
+		}
+
+		assert.PanicsWithValue(t, "missing config key 'redis_server_1_addr'", func() {
+			loadRedisServersConfig(&cfg, vip)
+		})
+	})
+}
+
+func TestLoadMemcacheServersConfig(t *testing.T) {
+	t.Run("missing id", func(t *testing.T) {
+		vip := viper.New()
+		cfg := Config{
+			MemcacheNumServers: 1,
+		}
+		assert.PanicsWithValue(t, "missing config key 'memcache_server_1_id'", func() {
+			loadMemcacheServersConfig(&cfg, vip)
+		})
+	})
+
+	t.Run("missing addr", func(t *testing.T) {
+		vip := viper.New()
+		vip.Set("memcache_server_1_id", uint32(11))
+
+		cfg := Config{
+			MemcacheNumServers: 1,
+		}
+
+		assert.PanicsWithValue(t, "missing config key 'memcache_server_1_addr'", func() {
+			loadMemcacheServersConfig(&cfg, vip)
+		})
+	})
+}
+
+func TestValidateRedisServerConfig(t *testing.T) {
+	t.Run("invalid client type", func(t *testing.T) {
+		c := Config{
+			ClientType: "another",
+			RedisServers: []RedisConfig{
+				{ID: 11, Addr: "localhost:6379"},
+				{ID: 12, Addr: "localhost:6380"},
+			},
+		}
+		assert.PanicsWithValue(t, "invalid client type 'another'", func() {
+			c.validateConfig()
+		})
+	})
+
 	t.Run("duplicated", func(t *testing.T) {
 		c := Config{
+			ClientType: ClientTypeRedis,
 			RedisServers: []RedisConfig{
 				{ID: 11, Addr: "localhost:6379"},
 				{ID: 11, Addr: "localhost:6380"},
 			},
 		}
 		assert.PanicsWithValue(t, "duplicated redis server id '11'", func() {
-			c.validateRedisServers()
+			c.validateConfig()
 		})
 	})
 
 	t.Run("server id empty", func(t *testing.T) {
 		c := Config{
+			ClientType: ClientTypeRedis,
 			RedisServers: []RedisConfig{
 				{ID: 0},
 			},
 		}
 		assert.PanicsWithValue(t, "redis server id must not be empty", func() {
-			c.validateRedisServers()
+			c.validateConfig()
 		})
 	})
 
 	t.Run("server addr empty", func(t *testing.T) {
 		c := Config{
+			ClientType: ClientTypeRedis,
 			RedisServers: []RedisConfig{
 				{
 					ID:   11,
@@ -119,12 +201,13 @@ func TestValidateServerIDs(t *testing.T) {
 			},
 		}
 		assert.PanicsWithValue(t, "redis server address must not be empty", func() {
-			c.validateRedisServers()
+			c.validateConfig()
 		})
 	})
 
 	t.Run("server addr duplicated", func(t *testing.T) {
 		c := Config{
+			ClientType: ClientTypeRedis,
 			RedisServers: []RedisConfig{
 				{
 					ID:   11,
@@ -137,16 +220,79 @@ func TestValidateServerIDs(t *testing.T) {
 			},
 		}
 		assert.PanicsWithValue(t, "duplicated redis server address 'addr1'", func() {
-			c.validateRedisServers()
+			c.validateConfig()
 		})
 	})
 
 	t.Run("redis servers is emtpy", func(t *testing.T) {
 		c := Config{
+			ClientType:   ClientTypeRedis,
 			RedisServers: []RedisConfig{},
 		}
 		assert.PanicsWithValue(t, "redis server list must not be empty", func() {
-			c.validateRedisServers()
+			c.validateConfig()
+		})
+	})
+}
+
+func TestValidateMemcacheServerConfig(t *testing.T) {
+	t.Run("duplicated ids", func(t *testing.T) {
+		c := Config{
+			ClientType: ClientTypeMemcache,
+			MemcacheServers: []MemcacheConfig{
+				{ID: 11, Addr: "localhost:11211"},
+				{ID: 11, Addr: "localhost:11212"},
+			},
+		}
+		assert.PanicsWithValue(t, "duplicated memcache server id '11'", func() {
+			c.validateConfig()
+		})
+	})
+
+	t.Run("id empty", func(t *testing.T) {
+		c := Config{
+			ClientType: ClientTypeMemcache,
+			MemcacheServers: []MemcacheConfig{
+				{ID: 0, Addr: "localhost:11211"},
+			},
+		}
+		assert.PanicsWithValue(t, "memcache server id must not be empty", func() {
+			c.validateConfig()
+		})
+	})
+
+	t.Run("addr empty", func(t *testing.T) {
+		c := Config{
+			ClientType: ClientTypeMemcache,
+			MemcacheServers: []MemcacheConfig{
+				{ID: 21, Addr: ""},
+			},
+		}
+		assert.PanicsWithValue(t, "memcache server address must not be empty", func() {
+			c.validateConfig()
+		})
+	})
+
+	t.Run("duplicated address", func(t *testing.T) {
+		c := Config{
+			ClientType: ClientTypeMemcache,
+			MemcacheServers: []MemcacheConfig{
+				{ID: 21, Addr: "localhost:11211"},
+				{ID: 22, Addr: "localhost:11211"},
+			},
+		}
+		assert.PanicsWithValue(t, "duplicated memcache server address 'localhost:11211'", func() {
+			c.validateConfig()
+		})
+	})
+
+	t.Run("config empty", func(t *testing.T) {
+		c := Config{
+			ClientType:      ClientTypeMemcache,
+			MemcacheServers: []MemcacheConfig{},
+		}
+		assert.PanicsWithValue(t, "memcache server list must not be empty", func() {
+			c.validateConfig()
 		})
 	})
 }

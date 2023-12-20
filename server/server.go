@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/QuangTung97/eventx"
+	"github.com/QuangTung97/go-memcache/memcache"
 	"github.com/dustin/go-humanize"
 	"github.com/jmoiron/sqlx"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -19,8 +20,9 @@ import (
 
 	"github.com/QuangTung97/cacheinv"
 	"github.com/QuangTung97/cacheinv/config"
+	memcache_client "github.com/QuangTung97/cacheinv/memcache"
 	"github.com/QuangTung97/cacheinv/mysql"
-	cache_client "github.com/QuangTung97/cacheinv/redis"
+	redis_client "github.com/QuangTung97/cacheinv/redis"
 
 	_ "github.com/go-sql-driver/mysql" // import mysql driver
 )
@@ -47,9 +49,7 @@ func initRepo(conf config.Config) cacheinv.Repository {
 	return mysql.NewRepository(db, conf.EventTableName, conf.OffsetTableName)
 }
 
-func initClient(conf config.Config) cacheinv.Client {
-	printSep()
-
+func initRedisClient(conf config.Config) cacheinv.Client {
 	clients := map[int64]*redis.Client{}
 
 	for _, redisConf := range conf.RedisServers {
@@ -60,7 +60,31 @@ func initClient(conf config.Config) cacheinv.Client {
 		clients[int64(redisConf.ID)] = redisClient
 	}
 
-	return cache_client.NewClient(clients)
+	return redis_client.NewClient(clients)
+}
+
+func initMemcacheClient(conf config.Config) cacheinv.Client {
+	clients := map[int64]*memcache.Client{}
+
+	for _, mcConf := range conf.MemcacheServers {
+		fmt.Printf("Connect to Memcache: '%s'\n", mcConf.Addr)
+		redisClient, err := memcache.New(mcConf.Addr, 1)
+		if err != nil {
+			panic(err)
+		}
+		clients[int64(mcConf.ID)] = redisClient
+	}
+
+	return memcache_client.NewClient(clients)
+}
+
+func initClient(conf config.Config) cacheinv.Client {
+	printSep()
+
+	if conf.ClientType == config.ClientTypeRedis {
+		return initRedisClient(conf)
+	}
+	return initMemcacheClient(conf)
 }
 
 // Start ...
