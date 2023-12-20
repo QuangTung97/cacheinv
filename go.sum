@@ -2,6 +2,8 @@ github.com/BurntSushi/toml v1.3.2 h1:o7IhLm0Msx3BaB+n3Ag7L8EVlByGnpq14C4YWiu/gL8
 github.com/BurntSushi/toml v1.3.2/go.mod h1:CxXYINrC8qIiEnFrOxCa7Jy5BFHlXnUU2pbicEuybxQ=
 github.com/QuangTung97/eventx v0.5.1 h1:0D78qZBxDZOumUOnlSUfiJtQnmyF9afw8HHyydD6Rjg=
 github.com/QuangTung97/eventx v0.5.1/go.mod h1:/vtHDxPJ6DJbF0GRfEnsH2rUg/rzW1AZY+RivUcV9bA=
+github.com/QuangTung97/go-memcache v1.2.0 h1:LePkaWc4iGil1EzT/c7XzgAXo+sGiGfXoWA5o572+0U=
+github.com/QuangTung97/go-memcache v1.2.0/go.mod h1:bInH+oopFx83sRE0DaLVuXc6t3c6DsapM3Y7B7IUpOg=
 github.com/benbjohnson/clock v1.1.0 h1:Q92kusRqC1XV2MjkWETPvjJVqKetz1OzxZB7mHJLju8=
 github.com/benbjohnson/clock v1.1.0/go.mod h1:J11/hYXuz8f4ySSvYwY0FKfm+ezbsZBKZxNJlLklBHA=
 github.com/beorn7/perks v1.0.1 h1:VlbKKnNfV8bJzeqoa4cOKqO6bYr3WgKZxO8Z16+hsOM=
