@@ -140,4 +140,13 @@ func TestValidateServerIDs(t *testing.T) {
 			c.validateRedisServers()
 		})
 	})
+
+	t.Run("redis servers is emtpy", func(t *testing.T) {
+		c := Config{
+			RedisServers: []RedisConfig{},
+		}
+		assert.PanicsWithValue(t, "redis server list must not be empty", func() {
+			c.validateRedisServers()
+		})
+	})
 }

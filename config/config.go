@@ -147,6 +147,10 @@ func (c Config) validateRedisServers() {
 	serverIDs := map[uint32]struct{}{}
 	serverAddrs := map[string]struct{}{}
 
+	if len(c.RedisServers) == 0 {
+		panic("redis server list must not be empty")
+	}
+
 	for _, s := range c.RedisServers {
 		if s.ID <= 0 {
 			panic("redis server id must not be empty")
