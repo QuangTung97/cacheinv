@@ -86,13 +86,58 @@ func TestLoadConfig(t *testing.T) {
 }
 
 func TestValidateServerIDs(t *testing.T) {
-	c := Config{
-		RedisServers: []RedisConfig{
-			{ID: 11},
-			{ID: 11},
-		},
-	}
-	assert.PanicsWithValue(t, "duplicated redis server id '11'", func() {
-		c.validateRedisServers()
+	t.Run("duplicated", func(t *testing.T) {
+		c := Config{
+			RedisServers: []RedisConfig{
+				{ID: 11, Addr: "localhost:6379"},
+				{ID: 11, Addr: "localhost:6380"},
+			},
+		}
+		assert.PanicsWithValue(t, "duplicated redis server id '11'", func() {
+			c.validateRedisServers()
+		})
+	})
+
+	t.Run("server id empty", func(t *testing.T) {
+		c := Config{
+			RedisServers: []RedisConfig{
+				{ID: 0},
+			},
+		}
+		assert.PanicsWithValue(t, "redis server id must not be empty", func() {
+			c.validateRedisServers()
+		})
+	})
+
+	t.Run("server addr empty", func(t *testing.T) {
+		c := Config{
+			RedisServers: []RedisConfig{
+				{
+					ID:   11,
+					Addr: "",
+				},
+			},
+		}
+		assert.PanicsWithValue(t, "redis server address must not be empty", func() {
+			c.validateRedisServers()
+		})
+	})
+
+	t.Run("server addr duplicated", func(t *testing.T) {
+		c := Config{
+			RedisServers: []RedisConfig{
+				{
+					ID:   11,
+					Addr: "addr1",
+				},
+				{
+					ID:   12,
+					Addr: "addr1",
+				},
+			},
+		}
+		assert.PanicsWithValue(t, "duplicated redis server address 'addr1'", func() {
+			c.validateRedisServers()
+		})
 	})
 }

@@ -145,11 +145,26 @@ func (c MySQLConfig) PrintDSN() string {
 
 func (c Config) validateRedisServers() {
 	serverIDs := map[uint32]struct{}{}
+	serverAddrs := map[string]struct{}{}
+
 	for _, s := range c.RedisServers {
+		if s.ID <= 0 {
+			panic("redis server id must not be empty")
+		}
+		if len(s.Addr) == 0 {
+			panic("redis server address must not be empty")
+		}
+
 		_, existed := serverIDs[s.ID]
 		if existed {
 			panic(fmt.Sprintf("duplicated redis server id '%d'", s.ID))
 		}
 		serverIDs[s.ID] = struct{}{}
+
+		_, existed = serverAddrs[s.Addr]
+		if existed {
+			panic(fmt.Sprintf("duplicated redis server address '%s'", s.Addr))
+		}
+		serverAddrs[s.Addr] = struct{}{}
 	}
 }
